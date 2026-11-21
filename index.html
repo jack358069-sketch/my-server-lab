@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>我的小站</title>
+<style>
+  :root { --fg:#1d1d1f; --muted:#6e6e73; --bg:#f5f5f7; --card:#fff; --accent:#0071e3; }
+  * { box-sizing: border-box; }
+  body { margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
+         background:radial-gradient(1200px 600px at 20% 0%, #e8f0ff 0%, var(--bg) 45%, #fafafa 100%);
+         font-family: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+         color:var(--fg); padding:32px 16px; }
+  .wrap { width:100%; max-width:720px; }
+  .hero { text-align:center; margin-bottom:24px; }
+  .avatar { width:88px; height:88px; border-radius:50%; margin:0 auto 18px;
+            background:linear-gradient(135deg,#5aa7ff,#7c5cff); display:flex;
+            align-items:center; justify-content:center; font-size:38px; color:#fff;
+            box-shadow:0 8px 24px rgba(90,167,255,.35); }
+  h1 { font-size:34px; margin:0 0 8px; letter-spacing:-.5px; }
+  .sub { color:var(--muted); font-size:16px; margin:0; }
+  .wx { display:inline-flex; align-items:center; gap:10px; margin-top:16px; padding:10px 18px;
+        background:rgba(255,255,255,.8); border:1px solid rgba(0,0,0,.06); border-radius:999px;
+        font-size:14px; color:var(--fg); box-shadow:0 1px 2px rgba(0,0,0,.04); flex-wrap:wrap; }
+  .wx-temp { font-weight:600; }
+  .wx-dim { color:var(--muted); }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:14px; margin-top:30px; }
+  .card { display:block; text-decoration:none; color:inherit; background:var(--card);
+          border-radius:18px; padding:20px; border:1px solid rgba(0,0,0,.06);
+          box-shadow:0 1px 2px rgba(0,0,0,.04); transition:transform .18s ease, box-shadow .18s ease; }
+  .card:hover { transform:translateY(-3px); box-shadow:0 10px 28px rgba(0,0,0,.10); }
+  .icon { font-size:26px; }
+  .title { font-weight:600; margin:10px 0 4px; font-size:16px; }
+  .desc { color:var(--muted); font-size:14px; line-height:1.5; margin:0; }
+  footer { text-align:center; color:var(--muted); font-size:13px; margin-top:36px; }
+  footer a { color:var(--accent); text-decoration:none; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="hero">
+      <div class="avatar">👋</div>
+      <h1>我的小站</h1>
+      <p class="sub">一台 2 核 2G 的阿里云服务器 · 1Panel 部署</p>
+      <div class="wx" id="wx"><span class="wx-dim">天气加载中…</span></div>
+    </div>
+
+    <div class="grid">
+      <a class="card" href="http://47.115.150.227:40247" target="_blank" rel="noopener">
+        <div class="icon">🤖</div>
+        <p class="title">AI 聊天助手</p>
+        <p class="desc">自部署的 LobeChat，可切换多家模型对话。</p>
+      </a>
+      <a class="card" href="/daily.html">
+        <div class="icon">🌤</div>
+        <p class="title">天气详情</p>
+        <p class="desc">未来两天预报，每天 8 点自动更新。</p>
+      </a>
+      <a class="card" href="https://github.com" target="_blank" rel="noopener">
+        <div class="icon">💻</div>
+        <p class="title">代码仓库</p>
+        <p class="desc">GitHub 主页，换成你自己的地址。</p>
+      </a>
+      <a class="card" href="#">
+        <div class="icon">📮</div>
+        <p class="title">联系我</p>
+        <p class="desc">邮箱或微信二维码页，需要时再补。</p>
+      </a>
+    </div>
+
+    <footer>
+      由 OpenResty 提供服务 · 自建服务器实验页 · <a href="http://47.115.150.227:40247" target="_blank" rel="noopener">试试 AI 助手</a>
+    </footer>
+  </div>
+
+  <script>
+    fetch('/weather.json')
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) {
+        var el = document.getElementById('wx');
+        if (!d || d.error) { el.innerHTML = '<span class="wx-dim">天气暂不可用</span>'; return; }
+        el.innerHTML =
+          '<span>📍 ' + d.city + '</span>' +
+          '<span class="wx-temp">' + d.temp + '°</span>' +
+          '<span>' + d.desc + '</span>' +
+          '<span class="wx-dim">湿度 ' + d.humidity + '% · 风速 ' + d.wind + ' km/h</span>' +
+          '<span class="wx-dim">' + d.updated + ' 更新</span>';
+      })
+      .catch(function () {
+        document.getElementById('wx').innerHTML = '<span class="wx-dim">天气暂不可用</span>';
+      });
+  </script>
+</body>
+</html>
