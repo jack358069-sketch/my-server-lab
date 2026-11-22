@@ -4,22 +4,30 @@
     python3 monitor.py              # 采集一次，写入站点目录
     python3 monitor.py --demo       # 本地预览：生成演示数据到 ./_demo
     python3 monitor.py --outdir DIR # 指定输出目录
+    python3 monitor.py --test-alert # 按配置发一封测试邮件
 """
 import argparse
 import json
 import math
 import os
 import shutil
+import smtplib
 import socket
+import ssl
 import subprocess
 import time
+import traceback
 import urllib.error
 import urllib.request
 from datetime import datetime
+from email.header import Header
+from email.mime.text import MIMEText
 from html import escape
 
 SITE_DIR = "/opt/1panel/apps/openresty/openresty/www/sites/47.115.150.227/index"
 STATE_FILE = "/root/.monitor_state.json"
+ALERT_CONF = "/root/.monitor_alert.env"
+ALERT_COOLDOWN_H = 6  # 同类异常重复提醒间隔
 HISTORY_LEN = 288  # 5 分钟一个点 ≈ 24 小时
 HTTP_CHECKS = [
     ("本站首页", "http://127.0.0.1/"),
@@ -393,13 +401,12 @@ def render(snap: dict, hist: list) -> str:
 """
 
 
-def load_history() -> list:
+def load_state() -> dict:
     try:
         data = json.loads(read_text(STATE_FILE, "{}"))
-        hist = data.get("history", [])
-        return hist[-HISTORY_LEN:] if isinstance(hist, list) else []
+        return data if isinstance(data, dict) else {}
     except json.JSONDecodeError:
-        return []
+        return {}
 
 
 def append_history(hist: list, snap: dict) -> list:
@@ -414,14 +421,87 @@ def append_history(hist: list, snap: dict) -> list:
     return hist
 
 
-def save_history(hist: list) -> None:
-    tmp = STATE_FILE + ".tmp"
+def save_state(state: dict) -> None:
     try:
-        with open(tmp, "w", encoding="utf-8") as fh:
-            json.dump({"history": hist}, fh, ensure_ascii=False)
-        os.replace(tmp, STATE_FILE)
+        write_atomic(STATE_FILE, json.dumps(state, ensure_ascii=False))
     except OSError:
-        pass  # 历史保存失败不影响状态页
+        pass  # 状态保存失败不影响状态页
+
+
+def load_alert_conf() -> dict:
+    conf = {}
+    for line in read_text(ALERT_CONF).splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        conf[key.strip()] = value.strip().strip('"').strip("'")
+    return conf
+
+
+def send_email(subject: str, body: str) -> bool:
+    conf = load_alert_conf()
+    if not all(conf.get(k) for k in ("SMTP_HOST", "SMTP_USER", "SMTP_PASS", "ALERT_TO")):
+        print(f"alert: 未配置 {ALERT_CONF}，跳过发信")
+        return False
+    msg = MIMEText(body, "plain", "utf-8")
+    msg["Subject"] = Header(subject, "utf-8")
+    msg["From"] = conf.get("ALERT_FROM") or conf["SMTP_USER"]
+    msg["To"] = conf["ALERT_TO"]
+    host = conf["SMTP_HOST"]
+    port = int(conf.get("SMTP_PORT", "465"))
+    try:
+        if port == 465:
+            server = smtplib.SMTP_SSL(host, port, timeout=15, context=ssl.create_default_context())
+        else:
+            server = smtplib.SMTP(host, port, timeout=15)
+            server.starttls(context=ssl.create_default_context())
+        with server:
+            server.login(conf["SMTP_USER"], conf["SMTP_PASS"])
+            server.send_message(msg)
+        print(f"alert: 已发送邮件 -> {conf['ALERT_TO']}")
+        return True
+    except Exception as exc:  # SMTP 失败不能影响状态页
+        print(f"alert: 发送失败：{str(exc)[:120]}")
+        print("trace: " + " | ".join(traceback.format_exc().strip().splitlines()[-3:]))
+        return False
+
+
+def maybe_alert(snap: dict, alert_state: dict) -> dict:
+    """异常组合变化时发信；同类每 ALERT_COOLDOWN_H 小时最多一次；恢复时发一封。"""
+    if not load_alert_conf():
+        return alert_state
+    warnings = snap["warnings"]
+    now = time.time()
+    fp = "|".join(warnings)
+    prev_fp = alert_state.get("fp", "")
+    last = float(alert_state.get("sent_at", 0))
+    attempt = float(alert_state.get("attempt_at", 0))
+    page = "http://47.115.150.227/status.html"
+
+    if warnings:
+        if fp != prev_fp or now - last >= ALERT_COOLDOWN_H * 3600:
+            if now - attempt < 1800:  # 发信失败后 30 分钟内不重试
+                return alert_state
+            body = "\n".join(
+                [f"主机：{snap['host']}", f"时间：{snap['time']}", "", "异常项："]
+                + [f"- {w}" for w in warnings]
+                + ["", f"状态页：{page}"]
+            )
+            if send_email(f"[服务器告警] {snap['host']} {len(warnings)} 项异常", body):
+                return {"fp": fp, "sent_at": now}
+            alert_state = dict(alert_state)
+            alert_state["attempt_at"] = now
+        return alert_state
+
+    if prev_fp:
+        body = "\n".join(
+            [f"主机：{snap['host']}", f"时间：{snap['time']}", "", "所有检查项已恢复正常。",
+             "", f"状态页：{page}"]
+        )
+        if send_email(f"[服务器恢复] {snap['host']} 运行正常", body):
+            return {}
+    return alert_state
 
 
 def write_atomic(path: str, text: str) -> None:
@@ -473,7 +553,17 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--demo", action="store_true", help="生成本地演示数据")
     parser.add_argument("--outdir", default="", help="输出目录")
+    parser.add_argument("--test-alert", action="store_true", help="按配置发送测试邮件")
     args = parser.parse_args()
+
+    if args.test_alert:
+        body = "\n".join([
+            "这是一封测试邮件。",
+            f"主机：{socket.gethostname()}",
+            f"时间：{datetime.now():%Y-%m-%d %H:%M}",
+        ])
+        return 0 if send_email("[测试] 服务器监控邮件通知", body) else 1
+
     outdir = args.outdir or (os.path.join(os.getcwd(), "_demo") if args.demo else SITE_DIR)
     os.makedirs(outdir, exist_ok=True)
 
@@ -481,8 +571,14 @@ def main() -> int:
         snap, hist = demo_data()
     else:
         snap = collect()
-        hist = append_history(load_history(), snap)
-        save_history(hist)
+        state = load_state()
+        hist = state.get("history", [])
+        if not isinstance(hist, list):
+            hist = []
+        hist = append_history(hist, snap)
+        state["history"] = hist
+        state["alert"] = maybe_alert(snap, state.get("alert", {}))
+        save_state(state)
 
     write_atomic(os.path.join(outdir, "status.html"), render(snap, hist))
     write_atomic(os.path.join(outdir, "status.json"),

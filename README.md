@@ -29,6 +29,7 @@
 3. 每日 8:00 定时任务：生成天气页面与数据
 4. 每 5 分钟监控采集：`/status.html` 显示资源占用、服务存活与 24 小时趋势
 5. 每日 3:00 / 3:10 备份站点与 LobeChat 数据到本地磁盘，保留 7 份
+6. 邮件告警：异常时发邮件，同类 6 小时内最多一封；恢复正常后发一封恢复通知
 
 ## 部署步骤（简版）
 
@@ -41,6 +42,7 @@
 7. 把 `monitor.py` 上传到 `/root`，运行 `python3 monitor.py` 验证，再建计划任务每 5 分钟执行 `cd /root && python3 monitor.py`
 8. 1Panel → 计划任务 → 备份网站：选站点 `47.115.150.227`，每天 03:00，备份到本地磁盘，保留 7 份
 9. 1Panel → 计划任务 → 备份应用：选 LobeChat，每天 03:10，保留 7 份（没有「备份应用」就用「备份目录」备份 `/opt/1panel/apps/lobe-chat`）
+10. 在 `/root/.monitor_alert.env` 填 SMTP 配置（见告警说明），执行 `python3 monitor.py --test-alert` 验证收信
 
 ## 监控说明
 
@@ -50,6 +52,24 @@
 - 全走本机 `/proc` 与回环探测，不产生公网流量；页面公网可见，只展示资源数字和容器名，不含路径、密钥与进程参数
 - 容器名按包含 `openresty` / `lobe` 判断，端口按 80 / 40247 探测；换端口或改容器名时改 `monitor.py` 顶部常量
 - 本地预览：`python3 monitor.py --demo`，输出到 `_demo/status.html`
+
+## 告警说明（邮件）
+
+1. QQ 邮箱网页 → 设置 → 账号 → 开启 POP3/SMTP 服务 → 获取**授权码**（授权码不是 QQ 密码）
+2. 服务器上创建 `/root/.monitor_alert.env`（权限 600）：
+
+```
+SMTP_HOST=smtp.qq.com
+SMTP_PORT=465
+SMTP_USER=你的QQ邮箱@qq.com
+SMTP_PASS=授权码
+ALERT_TO=接收邮箱（可填同一个QQ邮箱）
+```
+
+3. 测试：`cd /root && python3 monitor.py --test-alert`，收到邮件即成功
+4. 规则：异常组合变化立即发信；同一组异常每 6 小时最多提醒一次；恢复后发一封恢复邮件；发信失败 30 分钟内不重试
+5. 未配置该文件时脚本照常生成状态页，只是不发信；配置文件不进仓库
+6. 收不到先查垃圾箱、再确认 465 端口出站正常
 
 ## 备份说明
 
