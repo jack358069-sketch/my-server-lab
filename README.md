@@ -20,12 +20,15 @@
 
 - `index.html`：站点首页，标题下通过 `fetch('/weather.json')` 显示一行天气
 - `daily.py`：抓取公开天气接口，生成 `daily.html`（详情页）与 `weather.json`（首页数据）
+- `monitor.py`：采集 CPU/内存/磁盘/负载/容器与端口存活，生成 `status.html`（状态页）与 `status.json`
 
 ## 功能
 
 1. 静态站点（80 端口，OpenResty 提供）
 2. LobeChat 网页 AI 助手（Docker 部署，访问密码保护）
 3. 每日 8:00 定时任务：生成天气页面与数据
+4. 每 5 分钟监控采集：`/status.html` 显示资源占用、服务存活与 24 小时趋势
+5. 每日 3:00 / 3:10 备份站点与 LobeChat 数据到本地磁盘，保留 7 份
 
 ## 部署步骤（简版）
 
@@ -35,6 +38,26 @@
 4. 把 `index.html` 上传到站点根目录（`.../www/sites/<IP>/index/`）
 5. 把 `daily.py` 上传到 `/root`，运行 `python3 daily.py 城市名` 验证
 6. 1Panel → 计划任务 → 每天 8:00 执行 `cd /root && python3 daily.py 城市名`
+7. 把 `monitor.py` 上传到 `/root`，运行 `python3 monitor.py` 验证，再建计划任务每 5 分钟执行 `cd /root && python3 monitor.py`
+8. 1Panel → 计划任务 → 备份网站：选站点 `47.115.150.227`，每天 03:00，备份到本地磁盘，保留 7 份
+9. 1Panel → 计划任务 → 备份应用：选 LobeChat，每天 03:10，保留 7 份（没有「备份应用」就用「备份目录」备份 `/opt/1panel/apps/lobe-chat`）
+
+## 监控说明
+
+- 每 5 分钟采一次：CPU、内存（含 Swap）、磁盘、负载、运行时长、Docker 容器、80/40247 端口探测、天气数据新鲜度
+- 阈值：CPU 85% / 内存 90% / 磁盘 85% / 1 分钟负载 > 核心数 × 1.5 / 天气数据 30 小时未更新，触发即在页面顶部列出
+- 历史只留最近 288 个点（约 24 小时），存在 `/root/.monitor_state.json`，页面内嵌 SVG 趋势图
+- 全走本机 `/proc` 与回环探测，不产生公网流量；页面公网可见，只展示资源数字和容器名，不含路径、密钥与进程参数
+- 容器名按包含 `openresty` / `lobe` 判断，端口按 80 / 40247 探测；换端口或改容器名时改 `monitor.py` 顶部常量
+- 本地预览：`python3 monitor.py --demo`，输出到 `_demo/status.html`
+
+## 备份说明
+
+- 备份存放：1Panel 本地磁盘（默认 `/opt/1panel/backup`），每类保留 7 份
+- 覆盖范围：站点目录（页面、天气 JSON、状态数据）+ LobeChat 应用目录（含 `.env` 里的 API key，备份文件不要外传）
+- 恢复：网站 / 应用 → 备份列表 → 恢复；恢复前先手动备份一次当前状态
+- 局限：本地备份只能防误删、误改，防不了服务器磁盘损坏。每月用 FinalShell 把 `/opt/1panel/backup` 里的最新备份下载一份到电脑
+- 1Panel 面板自身配置不在备份范围，面板坏了重装后用本 README 重建即可
 
 ## 踩坑记录
 
