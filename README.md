@@ -4,6 +4,7 @@
 
 - 首页：`http://47.115.150.227`
 - AI 助手：LobeChat（Docker，端口 40247）
+- 博客：Typecho（Docker + MariaDB，端口 40300）
 
 ## 技术栈
 
@@ -28,13 +29,14 @@
 2. LobeChat 网页 AI 助手（Docker 部署，访问密码保护）
 3. 每日 8:00 定时任务：生成天气页面与数据
 4. 每 5 分钟监控采集：`/status.html` 显示资源占用、服务存活与 24 小时趋势
-5. 每日 3:00 / 3:10 备份站点与 LobeChat 数据到本地磁盘，保留 7 份
+5. 每日 3:00 / 3:10 / 3:20 备份站点、LobeChat、Typecho（MariaDB 另行备份）到本地磁盘，保留 7 份
 6. 邮件告警：异常时发邮件，同类 6 小时内最多一封；恢复正常后发一封恢复通知
 7. Typecho 博客（Docker + MariaDB，端口 40300），后台 `/admin/`
+8. SSH 密钥登录 + fail2ban 防爆破；1GB swap 兜底内存
 
 ## 部署步骤（简版）
 
-1. 阿里云 ECS（Ubuntu 22.04），安全组入方向放行 22 / 80 / 40247
+1. 阿里云 ECS（Ubuntu 22.04），安全组入方向放行 22 / 80 / 40130（面板）/ 40247 / 40300
 2. 安装 1Panel，浏览器登录面板（地址与安全入口用 `1pctl user-info` 查看）
 3. 1Panel → 应用商店 → 安装 OpenResty；网站 → 创建静态网站，主域名填服务器 IP
 4. 把 `index.html` 上传到站点根目录（`.../www/sites/<IP>/index/`）
@@ -45,6 +47,8 @@
 9. 1Panel → 计划任务 → 备份应用：选 LobeChat，每天 03:10，保留 7 份（没有「备份应用」就用「备份目录」备份 `/opt/1panel/apps/lobe-chat`）
 10. 在 `/root/.monitor_alert.env` 填 SMTP 配置（见告警说明），执行 `python3 monitor.py --test-alert` 验证收信
 11. 应用商店装 Typecho：先装 MariaDB 实例（3306 不对公网开放），Typecho 端口 `40300`、管理员密码自设；安全组放行 40300
+12. 本机生成 SSH 密钥，把公钥写入 `/root/.ssh/authorized_keys`，验证密钥登录成功后安装 fail2ban
+13. 增加 1GB swap（`/swapfile`），写入 `/etc/fstab`，`vm.swappiness=10`
 
 ## 监控说明
 
@@ -80,6 +84,30 @@ ALERT_TO=接收邮箱（可填同一个QQ邮箱）
 - 恢复：网站 / 应用 → 备份列表 → 恢复；恢复前先手动备份一次当前状态
 - 局限：本地备份只能防误删、误改，防不了服务器磁盘损坏。每月用 FinalShell 把 `/opt/1panel/backup` 里的最新备份下载一份到电脑
 - 1Panel 面板自身配置不在备份范围，面板坏了重装后用本 README 重建即可
+
+## 安全说明
+
+- SSH：ed25519 密钥登录，私钥只放本机（`~/.ssh/server_ecs_ed25519`），公钥写入服务器 `/root/.ssh/authorized_keys`
+- 密码登录暂时保留：1Panel 自带的「终端」依赖它；等不再用面板终端后可关闭
+- fail2ban：sshd jail 默认策略，多次失败自动封 IP；查看 `fail2ban-client status sshd`，解封 `fail2ban-client set sshd unbanip <IP>`
+- 公网端口：22 / 80 / 40130（面板）/ 40247 / 40300；数据库 3306 只在 1Panel 内网，不对外
+- 敏感文件：`/root/.monitor_alert.env`（600）、SSH 私钥、Typecho 后台密码，均不进仓库
+
+## 系统与 swap
+
+- 物理内存 2G（实际约 1.7GiB），2026-11 增加 1GB `/swapfile` 兜底，`vm.swappiness=10`
+- 查看：`free -h`、`swapon --show`
+- 移除：`swapoff /swapfile`，删掉 `/etc/fstab` 里的 `/swapfile` 行，再 `rm /swapfile`
+- 监控页显示的是物理内存占用，不含 swap
+
+## 运维速查
+
+```bash
+fail2ban-client status sshd          # 防爆破状态
+docker ps                            # 容器
+python3 /root/monitor.py --test-alert # 测试邮件
+free -h                              # 内存与 swap
+```
 
 ## 踩坑记录
 
