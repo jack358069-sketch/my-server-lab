@@ -7,6 +7,7 @@
     python3 monitor.py --test-alert # 按配置发一封测试邮件
 """
 import argparse
+import http.client
 import json
 import math
 import os
@@ -17,23 +18,24 @@ import ssl
 import subprocess
 import time
 import traceback
-import urllib.error
-import urllib.request
 from datetime import datetime
 from email.header import Header
 from email.mime.text import MIMEText
 from html import escape
+from pathlib import Path
 
 SITE_DIR = "/opt/1panel/apps/openresty/openresty/www/sites/47.115.150.227/index"
 STATE_FILE = "/root/.monitor_state.json"
 ALERT_CONF = "/root/.monitor_alert.env"
 ALERT_COOLDOWN_H = 6  # 同类异常重复提醒间隔
 HISTORY_LEN = 288  # 5 分钟一个点 ≈ 24 小时
+SITE_HOST = "47.115.150.227"  # 本站 vhost 的 ServerName，127.0.0.1 不带 Host 会落到默认站
 HTTP_CHECKS = [
-    ("本站首页", "http://127.0.0.1/"),
-    ("AI 助手", "http://127.0.0.1:40247/"),
+    ("本站首页", "127.0.0.1", 80, "/", SITE_HOST),
+    ("AI 助手", "127.0.0.1", 40247, "/", ""),
+    ("博客", "127.0.0.1", 40300, "/", ""),
 ]
-EXPECT_CONTAINERS = ("openresty", "lobe")  # 容器名包含这些关键字视为"应在运行"
+EXPECT_CONTAINERS = ("openresty", "lobe", "typecho", "mariadb")  # 容器名包含这些关键字视为"应在运行"
 THRESHOLDS = {"cpu": 85, "mem": 90, "disk": 85, "load_ratio": 1.5}
 WEATHER_MAX_AGE_H = 30
 
@@ -167,15 +169,26 @@ def docker_containers():
     return rows, ""
 
 
+LOCAL_HOSTS = ("127.0.0.1", "localhost", "::1")
+
+
 def http_checks():
     rows = []
-    for name, url in HTTP_CHECKS:
+    for name, host, port, path, vhost in HTTP_CHECKS:
+        # 只探测本机端口，主机名必须在白名单内，Host 头固定，防止 SSRF
+        if host not in LOCAL_HOSTS:
+            rows.append({"name": name, "code": 0, "ms": 0})
+            continue
         start = time.monotonic()
         try:
-            with urllib.request.urlopen(url, timeout=4) as resp:
-                code = resp.status
-        except urllib.error.HTTPError as exc:
-            code = exc.code
+            conn = http.client.HTTPConnection(host, port, timeout=4)
+            try:
+                conn.putrequest("GET", path, skip_host=True, skip_accept_encoding=True)
+                conn.putheader("Host", vhost or host)
+                conn.endheaders()
+                code = conn.getresponse().status
+            finally:
+                conn.close()
         except Exception:
             code = 0
         rows.append({"name": name, "code": code, "ms": round((time.monotonic() - start) * 1000)})
@@ -423,7 +436,7 @@ def append_history(hist: list, snap: dict) -> list:
 
 def save_state(state: dict) -> None:
     try:
-        write_atomic(STATE_FILE, json.dumps(state, ensure_ascii=False))
+        write_atomic(STATE_FILE, json.dumps(state, ensure_ascii=False), os.path.dirname(STATE_FILE))
     except OSError:
         pass  # 状态保存失败不影响状态页
 
@@ -504,13 +517,17 @@ def maybe_alert(snap: dict, alert_state: dict) -> dict:
     return alert_state
 
 
-def write_atomic(path: str, text: str) -> None:
-    tmp = path + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as fh:
-        fh.write(text)
-    os.replace(tmp, path)
+def write_atomic(path: str, text: str, base: str) -> None:
+    # 只允许写入指定基准目录内，规范化后校验，防止路径穿越
+    real = os.path.realpath(path)
+    real_base = os.path.realpath(base)
+    if real != real_base and not real.startswith(real_base + os.sep):
+        raise ValueError(f"拒绝写入白名单外路径: {real}")
+    tmp = real + ".tmp"
+    Path(tmp).write_text(text, encoding="utf-8")
+    os.replace(tmp, real)
     try:
-        os.chmod(path, 0o644)
+        os.chmod(real, 0o644)
     except OSError:
         pass
 
@@ -580,9 +597,9 @@ def main() -> int:
         state["alert"] = maybe_alert(snap, state.get("alert", {}))
         save_state(state)
 
-    write_atomic(os.path.join(outdir, "status.html"), render(snap, hist))
+    write_atomic(os.path.join(outdir, "status.html"), render(snap, hist), outdir)
     write_atomic(os.path.join(outdir, "status.json"),
-                 json.dumps(snap, ensure_ascii=False, indent=2))
+                 json.dumps(snap, ensure_ascii=False, indent=2), outdir)
 
     print(f"ok: {outdir}/status.html | warnings: {len(snap['warnings'])}")
     for warn in snap["warnings"]:

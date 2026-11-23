@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="520" viewBox="0 0 1600 520">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#141c3f"/>
+      <stop offset="0.45" stop-color="#2b3a8f"/>
+      <stop offset="0.75" stop-color="#5b4bd6"/>
+      <stop offset="1" stop-color="#8a5cff"/>
+    </linearGradient>
+    <radialGradient id="glow1" cx="0.18" cy="0.2" r="0.55">
+      <stop offset="0" stop-color="#6fb4ff" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#6fb4ff" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glow2" cx="0.85" cy="0.85" r="0.6">
+      <stop offset="0" stop-color="#ff8ad8" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#ff8ad8" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1600" height="520" fill="url(#bg)"/>
+  <rect width="1600" height="520" fill="url(#glow1)"/>
+  <rect width="1600" height="520" fill="url(#glow2)"/>
+  <g fill="#ffffff" opacity="0.10">
+    <circle cx="1180" cy="120" r="90"/>
+    <circle cx="1350" cy="210" r="46"/>
+    <circle cx="1230" cy="300" r="24"/>
+    <circle cx="980" cy="90" r="12"/>
+    <circle cx="1450" cy="120" r="10"/>
+    <circle cx="1080" cy="240" r="8"/>
+  </g>
+  <g opacity="0.75">
+    <rect x="110" y="160" width="10" height="150" rx="5" fill="#6fb4ff"/>
+    <rect x="132" y="190" width="10" height="90" rx="5" fill="#8a5cff"/>
+  </g>
+  <text x="160" y="230" fill="#ffffff" font-family="-apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="64" font-weight="700" letter-spacing="6">记录 · 折腾 · 分享</text>
+  <text x="162" y="292" fill="#c9d3ff" font-family="-apple-system, 'Segoe UI', sans-serif" font-size="22" letter-spacing="5">MY SERVER LAB</text>
+  <text x="162" y="336" fill="#9fb0e8" font-family="-apple-system, 'PingFang SC', sans-serif" font-size="16" letter-spacing="2">一台 2 核 2G 的阿里云服务器</text>
+</svg>

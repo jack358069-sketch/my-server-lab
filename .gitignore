@@ -1,0 +1,19 @@
+# 个人备忘（含账务与计划，不发布）
+服务器备忘.md
+
+# 本地演示输出
+_demo/
+_theme_tmp/
+
+# 安全扫描记录
+.mimosa/
+
+# Python
+__pycache__/
+*.py[cod]
+
+# 系统/编辑器
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
