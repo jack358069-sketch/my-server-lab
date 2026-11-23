@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>我的小站</title>
+<title>Zero Lab</title>
+<link rel="icon" href="/avatar.svg" type="image/svg+xml">
 <style>
   :root { --fg:#1d1d1f; --muted:#6e6e73; --bg:#f5f5f7; --card:#fff; --accent:#0071e3; }
   * { box-sizing: border-box; }
@@ -14,8 +15,7 @@
   .wrap { width:100%; max-width:720px; }
   .hero { text-align:center; margin-bottom:24px; }
   .avatar { width:88px; height:88px; border-radius:50%; margin:0 auto 18px;
-            background:linear-gradient(135deg,#5aa7ff,#7c5cff); display:flex;
-            align-items:center; justify-content:center; font-size:38px; color:#fff;
+            object-fit:cover; background:#fff;
             box-shadow:0 8px 24px rgba(90,167,255,.35); }
   h1 { font-size:34px; margin:0 0 8px; letter-spacing:-.5px; }
   .sub { color:var(--muted); font-size:16px; margin:0; }
@@ -39,8 +39,8 @@
 <body>
   <div class="wrap">
     <div class="hero">
-      <div class="avatar">👋</div>
-      <h1>我的小站</h1>
+      <img class="avatar" src="/avatar.svg" alt="Zero Lab">
+      <h1>Zero Lab</h1>
       <p class="sub">一台 2 核 2G 的阿里云服务器 · 1Panel 部署</p>
       <div class="wx" id="wx"><span class="wx-dim">天气加载中…</span></div>
     </div>
@@ -66,15 +66,15 @@
         <p class="title">博客</p>
         <p class="desc">Typecho 自建博客，记录折腾过程。</p>
       </a>
-      <a class="card" href="https://github.com" target="_blank" rel="noopener">
+      <a class="card" href="https://github.com/jack358069-sketch/my-server-lab" target="_blank" rel="noopener">
         <div class="icon">💻</div>
         <p class="title">代码仓库</p>
-        <p class="desc">GitHub 主页，换成你自己的地址。</p>
+        <p class="desc">服务器脚本与站点源码，跟着进度更新。</p>
       </a>
-      <a class="card" href="#">
-        <div class="icon">📮</div>
-        <p class="title">联系我</p>
-        <p class="desc">邮箱或微信二维码页，需要时再补。</p>
+      <a class="card" href="http://47.115.150.227:40300/index.php/feed/" target="_blank" rel="noopener">
+        <div class="icon">📡</div>
+        <p class="title">订阅博客</p>
+        <p class="desc">用 RSS 阅读器跟进新文章，不用常来看。</p>
       </a>
     </div>
 
