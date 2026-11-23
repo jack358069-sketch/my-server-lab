@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Zero Lab</title>
 <link rel="icon" href="/avatar.svg" type="image/svg+xml">
+<link rel="alternate" type="application/rss+xml" title="Zero Lab RSS" href="http://47.115.150.227:40300/index.php/feed/">
 <style>
   :root { --fg:#1d1d1f; --muted:#6e6e73; --bg:#f5f5f7; --card:#fff; --accent:#0071e3; }
   * { box-sizing: border-box; }
@@ -48,6 +49,10 @@
   .more { margin:10px 0 0; text-align:right; }
   .more a { color:var(--accent); text-decoration:none; font-size:14px; }
   .stats { margin:14px 0 0; color:var(--muted); font-size:13px; }
+  .zl-toast { position:fixed; left:50%; bottom:86px; transform:translateX(-50%) translateY(8px); z-index:10005;
+              background:rgba(29,29,31,.92); color:#fff; font-size:13px; padding:10px 16px; border-radius:999px;
+              opacity:0; pointer-events:none; transition:opacity .2s ease,transform .2s ease; max-width:86vw; text-align:center; }
+  .zl-toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
   .health { display:inline-flex; align-items:center; gap:8px; margin-top:10px; font-size:13px; color:var(--muted); }
   .health .dot { width:8px; height:8px; border-radius:50%; background:#8e8e93; }
   .health.ok .dot { background:#30d158; }
@@ -101,10 +106,10 @@
         <p class="title">代码仓库</p>
         <p class="desc">服务器脚本与站点源码，跟着进度更新。</p>
       </a>
-      <a class="card" href="http://47.115.150.227:40300/index.php/feed/" target="_blank" rel="noopener">
+      <a class="card" id="rss-card" href="http://47.115.150.227:40300/index.php/feed/" target="_blank" rel="noopener" title="点击复制订阅地址">
         <div class="icon">📡</div>
         <p class="title">订阅博客</p>
-        <p class="desc">用 RSS 阅读器跟进新文章，不用常来看。</p>
+        <p class="desc">点击复制订阅地址，粘到 RSS 阅读器里就能跟进新文章。</p>
       </a>
     </div>
 
@@ -185,6 +190,35 @@
         }
       })
       .catch(function () {});
+  </script>
+  <script>
+    function zlToast(msg) {
+      var el = document.getElementById('zl-toast');
+      if (!el) {
+        el = document.createElement('div');
+        el.id = 'zl-toast';
+        el.className = 'zl-toast';
+        document.body.appendChild(el);
+      }
+      el.textContent = msg;
+      el.classList.add('show');
+      clearTimeout(zlToast.timer);
+      zlToast.timer = setTimeout(function () { el.classList.remove('show'); }, 2600);
+    }
+    (function () {
+      var card = document.getElementById('rss-card');
+      if (!card) return;
+      card.addEventListener('click', function (e) {
+        var url = card.href;
+        e.preventDefault();
+        zlToast('订阅地址：' + url);
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(url).then(function () {
+            zlToast('订阅地址已复制，粘到 RSS 阅读器即可');
+          }, function () { /* 已显示地址，可手动复制 */ });
+        }
+      });
+    })();
   </script>
   <script src="/preset/personalize.js"></script>
 </body>
