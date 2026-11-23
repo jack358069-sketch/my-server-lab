@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>订阅 Zero Lab</title>
+<link rel="icon" href="/avatar.svg" type="image/svg+xml">
+<style>
+  :root { --fg:#1d1d1f; --muted:#6e6e73; --bg:#f5f5f7; --card:#fff; --accent:#0071e3; }
+  * { box-sizing: border-box; }
+  body { margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
+         background:radial-gradient(1200px 600px at 20% 0%, #e8f0ff 0%, var(--bg) 45%, #fafafa 100%);
+         font-family:-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+         color:var(--fg); padding:32px 16px; }
+  .wrap { width:100%; max-width:640px; }
+  h1 { font-size:30px; margin:0 0 10px; letter-spacing:-.5px; }
+  .sub { color:var(--muted); font-size:15px; margin:0 0 24px; line-height:1.6; }
+  .card { background:var(--card); border:1px solid rgba(0,0,0,.06); border-radius:18px;
+          padding:22px; box-shadow:0 1px 2px rgba(0,0,0,.04); }
+  .label { font-size:13px; color:var(--muted); margin:0 0 8px; }
+  .addr { display:flex; gap:8px; align-items:center; }
+  .addr input { flex:1; min-width:0; border:1px solid rgba(0,0,0,.12); border-radius:10px;
+                padding:10px 12px; font-size:14px; background:transparent; color:var(--fg); }
+  .addr button { border:0; border-radius:10px; padding:10px 18px; background:var(--accent);
+                 color:#fff; font-size:14px; cursor:pointer; white-space:nowrap; }
+  ul { margin:18px 0 0; padding-left:20px; color:var(--fg); font-size:14px; line-height:1.9; }
+  .tip { margin-top:18px; color:var(--muted); font-size:13px; line-height:1.7; }
+  footer { margin-top:26px; text-align:center; color:var(--muted); font-size:13px; }
+  footer a { color:var(--accent); text-decoration:none; }
+  .toast { position:fixed; left:50%; bottom:36px; transform:translateX(-50%); background:rgba(29,29,31,.92);
+           color:#fff; font-size:13px; padding:9px 16px; border-radius:999px; opacity:0;
+           transition:opacity .2s ease; pointer-events:none; }
+  .toast.show { opacity:1; }
+  @media (prefers-color-scheme: dark) {
+    :root { --fg:#f5f5f7; --muted:#98989d; --bg:#000; --card:#1c1c1e; --accent:#0a84ff; }
+    body { background:radial-gradient(1200px 600px at 20% 0%, #1d2b45 0%, #000 45%, #0a0a0c 100%); }
+    .card { border-color:rgba(255,255,255,.08); }
+    .addr input { border-color:rgba(255,255,255,.14); }
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>订阅 Zero Lab</h1>
+    <p class="sub">这是博客的 RSS 订阅源。它给阅读器读，浏览器直接打开只会看到 XML 代码，所以别直接点链接。</p>
+
+    <div class="card">
+      <p class="label">订阅地址（复制后粘到阅读器）</p>
+      <div class="addr">
+        <input id="feed" type="text" readonly value="http://47.115.150.227:40300/index.php/feed/">
+        <button id="copy" type="button">复制</button>
+      </div>
+      <ul>
+        <li>网页版阅读器：Inoreader、Feedly、蚁阅</li>
+        <li>桌面/手机阅读器：Fluent Reader、NetNewsWire、Reeder</li>
+        <li>部分阅读器可直接输入博客地址 <code>http://47.115.150.227:40300</code>，自动发现订阅源</li>
+      </ul>
+      <p class="tip">RSS 只用于“有新文章时提醒你”，不涉及账号或密码；不想用了在阅读器里删掉即可。</p>
+    </div>
+
+    <footer><a href="/">← 返回首页</a> · <a href="http://47.115.150.227:40300">去博客</a></footer>
+  </div>
+  <div class="toast" id="toast"></div>
+  <script>
+    function toast(msg) {
+      var el = document.getElementById('toast');
+      el.textContent = msg;
+      el.classList.add('show');
+      clearTimeout(toast.timer);
+      toast.timer = setTimeout(function () { el.classList.remove('show'); }, 2200);
+    }
+    document.getElementById('copy').addEventListener('click', function () {
+      var input = document.getElementById('feed');
+      input.select();
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(input.value).then(function () {
+          toast('已复制，粘到阅读器即可');
+        }, function () {
+          toast('已选中，可按 Ctrl+C 复制');
+        });
+      } else {
+        toast('已选中，可按 Ctrl+C 复制');
+      }
+    });
+  </script>
+</body>
+</html>
