@@ -48,6 +48,21 @@
   .more { margin:10px 0 0; text-align:right; }
   .more a { color:var(--accent); text-decoration:none; font-size:14px; }
   .stats { margin:14px 0 0; color:var(--muted); font-size:13px; }
+  .health { display:inline-flex; align-items:center; gap:8px; margin-top:10px; font-size:13px; color:var(--muted); }
+  .health .dot { width:8px; height:8px; border-radius:50%; background:#8e8e93; }
+  .health.ok .dot { background:#30d158; }
+  .health.bad .dot { background:#ff453a; }
+  @media (prefers-color-scheme: dark) {
+    :root { --fg:#f5f5f7; --muted:#98989d; --bg:#000; --card:#1c1c1e; --accent:#0a84ff; }
+    body { background:radial-gradient(1200px 600px at 20% 0%, #1d2b45 0%, #000 45%, #0a0a0c 100%); }
+    .wx { background:rgba(28,28,30,.8); border-color:rgba(255,255,255,.08); }
+    .card { border-color:rgba(255,255,255,.08); }
+    .posts li { border-color:rgba(255,255,255,.08); }
+    .zl-look-btn { background:#1c1c1e; color:#f5f5f7; }
+    .zl-look-panel { background:#1c1c1e; color:#f5f5f7; }
+    .zl-label { color:#d1d1d6; }
+    #zl-reset { background:#2c2c2e; color:#f5f5f7; }
+  }
 </style>
 </head>
 <body>
@@ -57,6 +72,7 @@
       <h1>Zero Lab</h1>
       <p class="sub">一台 2 核 2G 的阿里云服务器 · 1Panel 部署</p>
       <div class="wx" id="wx"><span class="wx-dim">天气加载中…</span></div>
+      <p class="health" id="health"><span class="dot"></span><span id="health-text">状态加载中…</span></p>
     </div>
 
     <div class="grid">
@@ -99,7 +115,9 @@
     </section>
 
     <footer>
-      由 OpenResty 提供服务 · 自建服务器实验页 · <a href="http://47.115.150.227:40247" target="_blank" rel="noopener">试试 AI 助手</a>
+      由 OpenResty 提供服务 · © 2026 Zero Lab ·
+      <a href="https://github.com/jack358069-sketch/my-server-lab" target="_blank" rel="noopener">GitHub</a> ·
+      <a href="http://47.115.150.227:40300" target="_blank" rel="noopener">博客</a>
       <p class="stats" id="stats"></p>
     </footer>
   </div>
@@ -152,8 +170,22 @@
           document.getElementById('stats').textContent =
             '近 24 小时访问：本站 ' + (pv.site || 0) + ' 次 · 博客 ' + (pv.blog || 0) + ' 次';
         }
+        var health = document.getElementById('health');
+        var healthText = document.getElementById('health-text');
+        if (health && healthText) {
+          var warnCount = (d.warnings && d.warnings.length) || 0;
+          var httpOk = (d.http || []).every(function (c) { return c.code >= 200 && c.code < 400; });
+          if (!warnCount && httpOk) {
+            health.className = 'health ok';
+            healthText.textContent = '服务正常 · ' + d.time + ' 更新';
+          } else {
+            health.className = 'health bad';
+            healthText.textContent = (warnCount ? warnCount + ' 项异常' : '服务探测异常') + ' · ' + d.time;
+          }
+        }
       })
       .catch(function () {});
   </script>
+  <script src="/preset/personalize.js"></script>
 </body>
 </html>
