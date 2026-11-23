@@ -6,6 +6,7 @@
 """
 import ipaddress
 import json
+import os
 import socket
 import sys
 import urllib.parse
@@ -13,11 +14,20 @@ import urllib.request
 from contextlib import closing
 from datetime import datetime
 from html import escape
+from pathlib import Path
 
 SITE_DIR = "/opt/1panel/apps/openresty/openresty/www/sites/47.115.150.227/index"
-OUT_HTML = f"{SITE_DIR}/daily.html"
-OUT_JSON = f"{SITE_DIR}/weather.json"
 API = "https://wttr.in"
+
+
+def write_site_file(name: str, text: str) -> None:
+    """只允许写站点目录下的白名单文件：目录固定，文件名来自白名单。"""
+    if name not in ("daily.html", "weather.json"):
+        raise ValueError(f"不允许写入的文件: {name}")
+    path = os.path.normpath(os.path.join(SITE_DIR, name))
+    if not path.startswith(os.path.normpath(SITE_DIR) + os.sep):
+        raise ValueError(f"输出路径越界: {path}")
+    Path(path).write_text(text, encoding="utf-8")
 
 
 def safe_get(url: str, timeout: int = 15) -> bytes:
@@ -95,8 +105,7 @@ def main() -> int:
     except Exception as exc:  # 网络失败也要产出页面，避免站点 404
         error = str(exc)[:200]
 
-    with open(OUT_HTML, "w", encoding="utf-8") as fh:
-        fh.write(render(city, current, days, updated, error))
+    write_site_file("daily.html", render(city, current, days, updated, error))
 
     payload = {
         "city": city,
@@ -107,10 +116,9 @@ def main() -> int:
         "updated": updated,
         "error": error,
     }
-    with open(OUT_JSON, "w", encoding="utf-8") as fh:
-        json.dump(payload, fh, ensure_ascii=False)
+    write_site_file("weather.json", json.dumps(payload, ensure_ascii=False))
 
-    print(f"ok: {OUT_HTML} / {OUT_JSON}")
+    print(f"ok: {SITE_DIR}/daily.html / {SITE_DIR}/weather.json")
     return 0
 
 
