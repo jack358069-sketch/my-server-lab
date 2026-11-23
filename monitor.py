@@ -8,9 +8,11 @@
 """
 import argparse
 import http.client
+import ipaddress
 import json
 import math
 import os
+import re
 import shutil
 import smtplib
 import socket
@@ -18,7 +20,8 @@ import ssl
 import subprocess
 import time
 import traceback
-from datetime import datetime
+import xml.etree.ElementTree as ET
+from datetime import datetime, timedelta, timezone
 from email.header import Header
 from email.mime.text import MIMEText
 from html import escape
@@ -30,6 +33,9 @@ ALERT_CONF = "/root/.monitor_alert.env"
 ALERT_COOLDOWN_H = 6  # 同类异常重复提醒间隔
 HISTORY_LEN = 288  # 5 分钟一个点 ≈ 24 小时
 SITE_HOST = "47.115.150.227"  # 本站 vhost 的 ServerName，127.0.0.1 不带 Host 会落到默认站
+BLOG_PORT = 40300
+SITE_LOG = os.path.join(os.path.dirname(SITE_DIR), "log", "access.log")
+PV_WINDOW_H = 24  # 访问统计窗口：最近 24 小时
 HTTP_CHECKS = [
     ("本站首页", "127.0.0.1", 80, "/", SITE_HOST),
     ("AI 助手", "127.0.0.1", 40247, "/", ""),
@@ -195,6 +201,101 @@ def http_checks():
     return rows
 
 
+LOG_LINE = re.compile(r'\S+ - - \[(.+?)\] "GET (.+?) HTTP')
+ASSET_SUFFIX = (".css", ".js", ".json", ".xml", ".svg", ".ico", ".png", ".jpg",
+                ".jpeg", ".webp", ".gz", ".woff", ".woff2", ".ttf")
+
+
+def _public_host(host: str) -> bool:
+    """只允许公网主机：解析后拒绝环回、私网、保留与链路本地地址。"""
+    try:
+        infos = socket.getaddrinfo(host, None)
+    except OSError:
+        return False
+    for info in infos:
+        try:
+            ip = ipaddress.ip_address(info[4][0])
+        except ValueError:
+            return False
+        if ip.is_loopback or ip.is_private or ip.is_reserved or ip.is_link_local:
+            return False
+    return True
+
+
+def _count_pv(lines: list, cutoff, blog: bool) -> int:
+    n = 0
+    for line in lines:
+        match = LOG_LINE.search(line)
+        if not match:
+            continue
+        try:
+            ts = datetime.strptime(match.group(1), "%d/%b/%Y:%H:%M:%S %z")
+        except ValueError:
+            continue
+        if ts < cutoff:
+            continue
+        path = match.group(2)
+        if path.startswith(("/usr/", "/admin/")) or path.endswith(ASSET_SUFFIX):
+            continue
+        if blog:
+            if path == "/" or path.startswith("/index.php/"):
+                n += 1
+        elif path in ("/", "/index.html", "/status.html", "/daily.html"):
+            n += 1
+    return n
+
+
+def site_pv(hours: int = PV_WINDOW_H):
+    try:
+        with open(SITE_LOG, "rb") as fh:
+            fh.seek(0, os.SEEK_END)
+            size = fh.tell()
+            fh.seek(max(0, size - 2_000_000))
+            lines = fh.read().decode("utf-8", "ignore").splitlines()
+    except OSError:
+        return None
+    return _count_pv(lines, datetime.now(timezone.utc) - timedelta(hours=hours), False)
+
+
+def blog_pv(containers: list, hours: int = PV_WINDOW_H):
+    name = next((c["name"] for c in containers if "typecho" in c["name"].lower()), "")
+    if not name:
+        return None
+    try:
+        out = subprocess.run(["docker", "logs", "--since", f"{hours}h", name],
+                             capture_output=True, text=True, timeout=20)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return _count_pv((out.stdout + out.stderr).splitlines(),
+                     datetime.now(timezone.utc) - timedelta(hours=hours), True)
+
+
+def blog_posts(limit: int = 3):
+    if not _public_host(SITE_HOST):
+        return [], "博客主机不在允许的公网范围"
+    try:
+        conn = http.client.HTTPConnection(SITE_HOST, BLOG_PORT, timeout=6)
+        try:
+            conn.request("GET", "/index.php/feed/")
+            body = conn.getresponse().read(200_000)
+        finally:
+            conn.close()
+        # 拒绝带 DTD/实体的 XML，避免实体扩展消耗资源
+        if b"<!DOCTYPE" in body or b"<!ENTITY" in body:
+            return [], "博客源含 DTD 声明，已拒绝解析"
+        root = ET.fromstring(body)
+    except Exception as exc:  # 网络或解析失败不影响状态采集
+        return [], f"博客订阅读取失败：{str(exc)[:80]}"
+    posts = []
+    for item in root.iter("item"):
+        title = (item.findtext("title") or "").strip()
+        link = (item.findtext("link") or "").strip()
+        date = (item.findtext("pubDate") or "").strip()
+        if title and link:
+            posts.append({"title": title, "link": link, "date": date})
+    return posts[:limit], ""
+
+
 def weather_info():
     path = os.path.join(SITE_DIR, "weather.json")
     try:
@@ -244,6 +345,9 @@ def collect() -> dict:
     checks = http_checks()
     weather = weather_info()
     top = top_processes()
+    posts, posts_err = blog_posts()
+    pv_site = site_pv()
+    pv_blog = blog_pv(containers)
 
     if cpu is not None and cpu >= THRESHOLDS["cpu"]:
         warnings.append(f"CPU 使用率 {cpu}% 偏高")
@@ -283,6 +387,8 @@ def collect() -> dict:
         "http": checks,
         "weather": weather,
         "top": top,
+        "blog": {"posts": posts, "error": posts_err},
+        "pv": {"site": pv_site, "blog": pv_blog},
         "warnings": warnings,
     }
 
