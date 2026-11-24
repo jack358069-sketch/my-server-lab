@@ -1,0 +1,2 @@
+# Zero Lab: 每 6 小时重建 sitemap
+17 */6 * * * root /root/gen_sitemap.sh >/dev/null 2>&1

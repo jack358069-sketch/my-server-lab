@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /action/
+
+Sitemap: http://47.115.150.227:40300/sitemap.xml

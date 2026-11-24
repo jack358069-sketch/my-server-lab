@@ -35,6 +35,9 @@
 6. 邮件告警：异常时发邮件，同类 6 小时内最多一封；恢复正常后发一封恢复通知
 7. Typecho 博客（Docker + MariaDB，端口 40300），后台 `/admin/`
 8. SSH 密钥登录 + fail2ban 防爆破；1GB swap 兜底内存
+9. SEO：静态站与博客都有 `robots.txt`、`sitemap.xml`（每 6 小时重建，见 `ops/gen_sitemap.sh`）；博客文章输出 og:image / twitter:image
+10. 访问统计：GoAccess 每小时生成 `/stats.html`（IP 匿名化、排除爬虫，见 `ops/cron-zerolab-stats`）
+11. 博客：评论开启且先审后发、主题自带目录（tocbot）、文章页上下篇导航（见 `ops/theme/README.md`）
 
 ## 部署步骤（简版）
 

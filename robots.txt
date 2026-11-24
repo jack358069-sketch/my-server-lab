@@ -1,0 +1,10 @@
+# Zero Lab —— 静态站与博客
+User-agent: *
+Allow: /
+Disallow: /status.json
+Disallow: /stats.html
+Disallow: /_demo/
+Disallow: /_theme_tmp/
+Disallow: /preset/
+
+Sitemap: http://47.115.150.227/sitemap.xml

@@ -1,0 +1,2 @@
+# Zero Lab: 每小时刷新静态站访问统计（IP 已匿名化）
+13 * * * * root /usr/bin/goaccess "/opt/1panel/apps/openresty/openresty/www/sites/47.115.150.227/log/access.log" --log-format=COMBINED --anonymize-ip --ignore-crawlers --html-report-title="Zero Lab 访问统计（静态站）" -o "/opt/1panel/apps/openresty/openresty/www/sites/47.115.150.227/index/stats.html" >/dev/null 2>&1
